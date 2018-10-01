@@ -1,0 +1,1 @@
+A implicação é que a assinatura seria validada apesar da mensagem enviada (x') ser diferente da original (x), ou seja, o atacante poderia fazer-se passar por outra pessoa realizado uma assinatura digital forjada
