@@ -1,0 +1,23 @@
+$ md5collgen -p Q1prefix.txt -o out1.bin out2.bin
+MD5 collision generator v1.5
+by Marc Stevens (http://www.win.tue.nl/hashclash/)
+
+Using output filenames: 'out1.bin' and 'out2.bin'
+Using prefixfile: 'Q1prefix.txt'
+Using initial value: 10e3c5eb5bb5137b529a446dda60e21d
+
+Generating first block: ..........................................................................................................
+Generating second block: S01..........
+Running time: 117.481 s
+[10/01/18]seed@VM:~/bin$ md5collgen -p Q2prefix64.txt -o Q2out1.bin Q2out2.bin
+MD5 collision generator v1.5
+by Marc Stevens (http://www.win.tue.nl/hashclash/)
+
+Using output filenames: 'Q2out1.bin' and 'Q2out2.bin'
+Using prefixfile: 'Q2prefix64.txt'
+Using initial value: 6695e7dcd44398a015d18d4ae7ef59f1
+
+Generating first block: ...................
+Generating second block: S10......
+Running time: 17.9778 s
+
