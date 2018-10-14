@@ -7,13 +7,10 @@ public class FileReaderWriter {
 
 
     private FileReaderWriter(){}
-    private static FileReaderWriter frw = null;
 
     public static FileReaderWriter getInstance(){
 
-        if (frw == null)
-           frw = new FileReaderWriter();
-        return frw;
+        return new FileReaderWriter();
     }
 
     public byte[] readBytesFromFile(String path) {
