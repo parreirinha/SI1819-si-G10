@@ -1,3 +1,5 @@
+package utils;
+
 import java.io.*;
 
 /**
@@ -13,33 +15,34 @@ public class FileReaderWriter {
         return new FileReaderWriter();
     }
 
-    public byte[] readBytesFromFile(String path) {
-        byte[] getBytes = null;
+    public int readBytesFromFile(String path, byte[] buffer, int idx, int len) {
+
+        byte[] getBytes = new byte[buffer.length];
+        int res = -1;
         try {
             File file = new File(path);
-            getBytes = new byte[(int) file.length()];
             InputStream is = new FileInputStream(file);
-            is.read(getBytes);
+            res = is.read(getBytes,idx,len);
             is.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return getBytes;
+        return res;
     }
 
-    public void createFileFromByteArray(String path, byte[] bytes) {
+    public void writeToFileFromArray(String path, byte[] bytes, int idx, int len) {
         try {
-            FileOutputStream writer = new FileOutputStream(path);
-            writer.write(bytes);
+            FileOutputStream writer = new FileOutputStream(path, true);
+            writer.write(bytes, idx, len);
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public String readKeyFromFile(String path)
+    public String readAllFile(String path)
     {
         String res = null;
         try(BufferedReader br = new BufferedReader(new FileReader(path))) {

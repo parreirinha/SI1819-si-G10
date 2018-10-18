@@ -1,5 +1,13 @@
+import utils.FileReaderWriter;
+import utils.Reader;
+import utils.Writer;
+
 import javax.crypto.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.*;
+import java.nio.file.Files;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
@@ -12,17 +20,18 @@ public class CipherDecipher {
 
     private String path, mode, inputFilePath, keyFilePath, resFileName, fileKey;
     private boolean decipherSucess = false;
-    FileReaderWriter fileReaderWriter;
-    byte[] bytes;
-    private final int bytesDimForCipher = 56;
+    private final int readDimensionBlock = 32, headerSize = 2;
+   // private FileReaderWriter readerWriter;
+    private int currIndex = 0;
+    private int authStart;
+    Reader reader;
+    Writer writer;
 
-
-    public  CipherDecipher(String[] args)
-    {
+    public  CipherDecipher(String[] cmdLineArgs) throws FileNotFoundException {
         path = System.getProperty("user.dir") + "\\src\\" ;
-        mode = args[0];
-        inputFilePath = path + args[1];
-        keyFilePath = path + args[2];
+        mode = cmdLineArgs[0];
+        inputFilePath = path + cmdLineArgs[1];
+        keyFilePath = path + cmdLineArgs[2];
         resFileName = path + mode.substring(1, mode.length()) + "Result";
 
         if (!(mode.equals("-cipher") || mode.equals("-decipher")))
@@ -30,8 +39,6 @@ public class CipherDecipher {
             System.out.println("invalid mode: choose '-cipher' or '-dicipher'");
             System.exit(1);
         }
-
-        fileReaderWriter = FileReaderWriter.getInstance();
     }
 
     private static void printByteArray(byte[] fileBytes) {
@@ -46,67 +53,61 @@ public class CipherDecipher {
 
     }
 
-    private void cipher() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    private void cipher() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
 
-        bytes = fileReaderWriter.readBytesFromFile(inputFilePath);
+        setHeaderFileResult();
 
         KeyGenerator keyGen = KeyGenerator.getInstance("DES");
-        SecretKey key = keyGen.generateKey();
+        SecretKey key = keyGen.generateKey();                   //TODO alterar para ler um ficheiro com 8 bytes
 
         Cipher cipher = Cipher.getInstance("DES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, key);
 
         int index = 0;
+        byte[] toCipher = new byte[readDimensionBlock];
+        byte[] bytesCiphered;
 
-        byte[] toCipher = getPartialArrayForUpdate(index);
-        byte[][] confidentialresult = initResultArrya(bytes.length);
+        Reader reader = new Reader();
 
-        for ( ; index < confidentialresult.length-1; index++)
+        int bytesReaded = reader.readBytesFromFile(inputFilePath,toCipher, index);
+
+        while(bytesReaded == readDimensionBlock)
         {
-            confidentialresult[index] = cipher.update(toCipher);
-            toCipher = getPartialArrayForUpdate(index * bytesDimForCipher);
+            bytesCiphered = cipher.update(toCipher);
+            toCipher = new byte[readDimensionBlock];
+            writer = new Writer();
+            writer.writeToFileFromArray(resFileName, bytesCiphered);
+            index += readDimensionBlock;
+            currIndex += readDimensionBlock;
+            reader = new Reader();
+            bytesReaded = reader.readBytesFromFile(inputFilePath, toCipher, index);
         }
-        confidentialresult[index] = cipher.doFinal(toCipher);
 
-        printTest(confidentialresult);
+        bytesCiphered = cipher.doFinal(toCipher);
+        writer = new Writer();
+        writer.writeToFileFromArray(resFileName, bytesCiphered);
+
+        currIndex += readDimensionBlock;;
+
+
+        // AND NOW AUTHENTICATION!!!
     }
 
-    private void printTest(byte[][] confidentialresult) {
+    private void setHeaderFileResult() throws IOException {
 
-        System.out.println("confidentialresult: " + confidentialresult.length);
-        int count = 0;
-        for (int i = 0; i < confidentialresult.length ; i++) {
-            for (int j = 0; j < bytesDimForCipher; j++) {
-                System.out.print(confidentialresult[i][j] + " | ");
-                count ++;
-            }
-            System.out.println();
+        File file = new File(resFileName);
+        boolean result = Files.deleteIfExists(file.toPath());
+        byte[] aux = new byte[headerSize];
+        for (int i = 0; i < headerSize; i++) {
+            aux[i] = (byte) 0x41;
         }
-        System.out.println("numero de bytes" + count);
+        Writer writer = new Writer();
+        writer.writeToFileFromArray(resFileName,aux);
+        currIndex += headerSize;
     }
 
-    private byte[][] initResultArrya(int length) {
 
-        int lines = bytes.length / bytesDimForCipher + 1 ; // necessita sempre de mais um bloco ou padding ou restantes bytes
-        //if(bytes.length / bytesDimForCipher > 0) lines++;
-        int cols = bytesDimForCipher;
-
-        return new byte[lines][cols];
-    }
-
-    private byte[] getPartialArrayForUpdate(int initial) {
-
-        byte[] res = new byte[bytesDimForCipher];
-        int last = initial + bytesDimForCipher;
-
-        for (int i = initial, idx = 0; i < last && i < bytes.length; )
-        {
-            res[idx++] = bytes[i++];
-        }
-        return res;
-    }
-
-    private static void verify(String[] args) {
+    private static void verifyArgsLength(String[] args) {
 
         if (args.length != 3)
         {
@@ -115,15 +116,21 @@ public class CipherDecipher {
         }
     }
 
-    public static void main(String[] args) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException {
+    public static void main(String[] args) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, IOException {
 
-        verify(args);
+        verifyArgsLength(args);
         CipherDecipher cd = new CipherDecipher(args);
 
         if (cd.mode.equals("-cipher"))
             cd.cipher();
         else
             cd.decipher();
+
+        byte[] key = new byte[cd.headerSize];
+        key[0] = (byte)0x41;
+        key[1] = (byte)0x42;
+        Writer writer = new Writer();
+        writer.writeWhithoutAppend(cd.resFileName, 0, key);
     }
 
 
