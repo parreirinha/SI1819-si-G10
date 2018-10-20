@@ -45,4 +45,10 @@ public class Reader {
         }
         return res;
     }
+
+    public int getFileLength(String path)
+    {
+        File file = new File(path);
+        return (int)file.length();
+    }
 }
