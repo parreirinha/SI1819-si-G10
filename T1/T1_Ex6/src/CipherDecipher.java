@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.*;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -19,19 +18,18 @@ import java.security.NoSuchAlgorithmException;
  */
 public class CipherDecipher {
 
-    private static final String HEADER_FILE_PATH = System.getProperty("user.dir") + "\\src\\headerTemp.txt";
     private static final String CHIPHER_FILE_PATH = System.getProperty("user.dir") + "\\src\\chipherTemp.txt";
     private static final String AUTH_FILE_PATH = System.getProperty("user.dir") + "\\src\\authTemp.txt";
     private static final String HMAC_SHA1 = "HmacSHA1";
     private static final String DES_CBC_PKCS5 = "DES/CBC/PKCS5Padding";
 
 
-    private static String RESULT_FILE_PATH = System.getProperty("user.dir") + "\\src\\FINAL_RESULT.txt";
+    private static String RESULT_FILE_PATH = System.getProperty("user.dir") + "\\src\\CIPHER_RESULT.txt";
     private static String INPUT_FILE_PATH = System.getProperty("user.dir") + "\\src\\";
     private static String KEY_FILE_PATH = System.getProperty("user.dir") + "\\src\\";
 
     private String mode;
-    private final int readDimensionBlock = 32, headerSize = 2;
+    private final int readDimensionBlock = 32;
 
     private Reader reader;
     private Writer writer;
@@ -40,7 +38,7 @@ public class CipherDecipher {
     private Mac mac;
 
 
-    private  CipherDecipher(String[] cmdLineArgs) throws FileNotFoundException, InterruptedException {
+    private  CipherDecipher(String[] cmdLineArgs) throws InterruptedException {
 
         mode = cmdLineArgs[0];
 
@@ -50,18 +48,30 @@ public class CipherDecipher {
             Thread.sleep(1000);
             System.exit(1);
         }
-
         INPUT_FILE_PATH += cmdLineArgs[1];
         KEY_FILE_PATH += cmdLineArgs[2];
     }
 
     private void decipher() {
+        
+        initDecipher();
 
     }
 
-    private void cipher() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+    private void initDecipher() {
 
-        init();
+        reader = new Reader();
+        writer = new Writer();
+
+        SecretKey key = getSecretKey();
+        initCipherAndMac(Cipher.DECRYPT_MODE, key);
+
+
+    }
+
+    private void cipher() throws BadPaddingException, IllegalBlockSizeException {
+
+        initChipher();
 
         byte[] toCipher = new byte[readDimensionBlock];
         byte[] bytesCiphered, bytesAuthentication;
@@ -88,42 +98,60 @@ public class CipherDecipher {
         writer.writeToFileFromArray(CHIPHER_FILE_PATH, bytesCiphered);      //last write to cipher file
         writer.writeToFileFromArray(AUTH_FILE_PATH, macAuth);
 
-
-
         concatFiles();
+        deleteUnnecessaryFiles();
     }
 
-    private void init() throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException {
-        deleteUnnecessaryFiles();   // TODO Remove
+    private void initChipher(){
 
+        deleteUnnecessaryFiles();
+        deleteIfExists(new File(RESULT_FILE_PATH));
         reader = new Reader();
         writer = new Writer();
-
-        KeyGenerator keyGen = KeyGenerator.getInstance("DES");
-        SecretKey key = keyGen.generateKey();                   //TODO alterar para ler um ficheiro com 8 bytes
-
-        cipher = Cipher.getInstance(DES_CBC_PKCS5);
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-
-        mac = Mac.getInstance(HMAC_SHA1);
-        mac.init(key);
+        SecretKey key = getSecretKey();
+        initCipherAndMac(Cipher.ENCRYPT_MODE, key);
     }
 
+    private SecretKey getSecretKey() {
+        KeyGenerator keyGen = null;
+        try {
+            keyGen = KeyGenerator.getInstance("DES");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        return keyGen.generateKey();
+    }
 
+    private void initCipherAndMac(int mode, SecretKey key) {
 
-    private void deleteUnnecessaryFiles() throws IOException {
+        try {
+            cipher = Cipher.getInstance(DES_CBC_PKCS5);
+            cipher.init(mode, key);
+            mac = Mac.getInstance(HMAC_SHA1);
+            mac.init(key);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+    }
 
-        deleteIfExists(new File(HEADER_FILE_PATH));
+    private void deleteUnnecessaryFiles() {
+
         deleteIfExists(new File(CHIPHER_FILE_PATH));
         deleteIfExists(new File(AUTH_FILE_PATH));
     }
-
-    //Delete File if exists
-    private void deleteIfExists(File file) throws IOException {
-        Files.deleteIfExists(file.toPath());
+    
+    private void deleteIfExists(File file){
+        try {
+            Files.deleteIfExists(file.toPath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
-
-
+    
     private static void verifyArgsLength(String[] args) {
 
         if (args.length != 3)
@@ -133,17 +161,22 @@ public class CipherDecipher {
         }
     }
 
-    private void concatFiles() throws IOException {
+    private void concatFiles() {
 
         File chipherFile = new File(CHIPHER_FILE_PATH);
         File authfile = new File(AUTH_FILE_PATH);
         File resultFile = new File(RESULT_FILE_PATH);
 
         FileJoin fj = new FileJoin();
-        fj.joinFiles(resultFile, new File[] {chipherFile, authfile});
-
-        deleteIfExists(chipherFile);
-        deleteIfExists(authfile);
+        try {
+            fj.joinFiles(resultFile, new File[] {chipherFile, authfile});
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        finally {
+            deleteIfExists(chipherFile);
+            deleteIfExists(authfile);
+        }
     }
 
     public static void main(String[] args) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, IOException, InterruptedException {
@@ -155,9 +188,5 @@ public class CipherDecipher {
             cd.cipher();
         else
             cd.decipher();
-
-
     }
-
-
 }
