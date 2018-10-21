@@ -27,6 +27,22 @@ public class Reader {
         return res;
     }
 
+    public byte[] getAllBytes(String path, int macSize) {
+
+        byte[] res = new byte[macSize];
+        try {
+            File file = new File(path);
+            InputStream is = new FileInputStream(file);
+            is.read(res);
+            is.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return res;
+    }
+
     public String readAllFile(String path)
     {
         String res = null;

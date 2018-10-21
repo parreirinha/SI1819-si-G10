@@ -1,15 +1,15 @@
+import utils.FileJoin;
+import utils.KeyReader;
 import utils.Reader;
 import utils.Writer;
-import utils.FileJoin;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.*;
 import java.nio.file.Files;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.util.Arrays;
 
 
 /**
@@ -18,11 +18,16 @@ import java.security.NoSuchAlgorithmException;
  */
 public class CipherDecipher {
 
+    //paths to cipher
     private static final String CHIPHER_FILE_PATH = System.getProperty("user.dir") + "\\src\\chipherTemp.txt";
     private static final String AUTH_FILE_PATH = System.getProperty("user.dir") + "\\src\\authTemp.txt";
     private static final String HMAC_SHA1 = "HmacSHA1";
     private static final String DES_CBC_PKCS5 = "DES/CBC/PKCS5Padding";
 
+    //paths to decipher
+    private static final String MAC_FROM_CIPHER_FILE_PATH = System.getProperty("user.dir") + "\\src\\mac_file_from_cipher.txt";
+    private static final String DECIPHERED_FILE_PATH = System.getProperty("user.dir") + "\\src\\DECIPHERED_FILE.pdf";
+    private static final String MAC_FROM_DECIPHER_FILE_PATH = System.getProperty("user.dir") + "\\src\\mac_file_from_decipher.txt";
 
     private static String RESULT_FILE_PATH = System.getProperty("user.dir") + "\\src\\CIPHER_RESULT.txt";
     private static String INPUT_FILE_PATH = System.getProperty("user.dir") + "\\src\\";
@@ -36,6 +41,9 @@ public class CipherDecipher {
 
     private Cipher cipher;
     private Mac mac;
+
+    private SecureRandom rnd = new SecureRandom();
+    private IvParameterSpec iv = new IvParameterSpec(rnd.generateSeed(8));
 
 
     private  CipherDecipher(String[] cmdLineArgs) throws InterruptedException {
@@ -52,29 +60,12 @@ public class CipherDecipher {
         KEY_FILE_PATH += cmdLineArgs[2];
     }
 
-    private void decipher() {
-        
-        initDecipher();
-
-    }
-
-    private void initDecipher() {
-
-        reader = new Reader();
-        writer = new Writer();
-
-        SecretKey key = getSecretKey();
-        initCipherAndMac(Cipher.DECRYPT_MODE, key);
-
-
-    }
-
     private void cipher() throws BadPaddingException, IllegalBlockSizeException {
 
         initChipher();
 
         byte[] toCipher = new byte[readDimensionBlock];
-        byte[] bytesCiphered, bytesAuthentication;
+        byte[] bytesCiphered;
         int index = 0;
 
         int bytesReaded = reader.readBytesFromFile(INPUT_FILE_PATH,toCipher, index);
@@ -102,6 +93,83 @@ public class CipherDecipher {
         deleteUnnecessaryFiles();
     }
 
+
+    private void decipher() throws BadPaddingException, IllegalBlockSizeException {
+        
+        initDecipher();
+
+        int macLength = mac.getMacLength();
+        byte[] macArray = new byte[macLength];
+        int fileLength = reader.getFileLength(RESULT_FILE_PATH);
+
+        // Get MAC from ciphered file
+        reader.readBytesFromFile(RESULT_FILE_PATH, macArray, fileLength - macLength -1 );
+        writer.writeToFileFromArray(MAC_FROM_CIPHER_FILE_PATH, macArray);
+
+        // Get Ciphered file and Dicipher it
+        byte[] toDecipher = new byte[readDimensionBlock];
+        byte[] bytesDiciphered;
+        int index = 0;
+
+        int bytesReaded = reader.readBytesFromFile(RESULT_FILE_PATH, toDecipher, index);
+
+        while(bytesReaded == readDimensionBlock && (index + readDimensionBlock < fileLength - macLength -1))
+        {
+            bytesDiciphered = cipher.update(toDecipher);                      //Decipher file
+            mac.update(bytesDiciphered);
+
+            toDecipher = new byte[readDimensionBlock];                        //clear byte[]
+
+            writer.writeToFileFromArray(DECIPHERED_FILE_PATH, bytesDiciphered);  //write to deciphered file
+
+            index += readDimensionBlock;                                    //Update index to read input file
+            if(index + readDimensionBlock > fileLength) break;
+            bytesReaded = reader.readBytesFromFile(RESULT_FILE_PATH, toDecipher, index);   //Read with skip of index length
+        }
+
+        toDecipher = new byte[fileLength - macLength - index];      // last bytes to read
+        reader.readBytesFromFile(RESULT_FILE_PATH, toDecipher, index);
+
+        bytesDiciphered = cipher.doFinal(toDecipher);               // decipher doFinal
+        byte[] macDecipheredFile = mac.doFinal(bytesDiciphered);    // mac doFinal
+
+        writer.writeToFileFromArray(DECIPHERED_FILE_PATH, bytesDiciphered);             // last write to decipher file
+        writer.writeToFileFromArray(MAC_FROM_DECIPHER_FILE_PATH, macDecipheredFile);    // write mac file
+
+        int cipherMacsize = reader.getFileLength(MAC_FROM_CIPHER_FILE_PATH);        // get MAC files
+        int deciperMacsize = reader.getFileLength(MAC_FROM_DECIPHER_FILE_PATH);
+
+        byte[] cipherMac = reader.getAllBytes(MAC_FROM_CIPHER_FILE_PATH, cipherMacsize);        // Compare MACs
+        byte[] decipherMac = reader.getAllBytes(MAC_FROM_DECIPHER_FILE_PATH, deciperMacsize);
+        boolean isSameMac = Arrays.equals(cipherMac, decipherMac);
+
+
+
+
+
+        
+        if (isSameMac)
+        {
+            System.out.println("Decipher OK");
+        }
+        else
+        {
+            System.out.println("Decipher NOT OK!!!");
+        }
+    }
+
+    private void initDecipher() {
+
+        deleteIfExists(new File(MAC_FROM_CIPHER_FILE_PATH));
+        deleteIfExists(new File(DECIPHERED_FILE_PATH));
+        deleteIfExists(new File(MAC_FROM_DECIPHER_FILE_PATH));
+
+        reader = new Reader();
+        writer = new Writer();
+        SecretKey key = getSecretKey();
+        initCipherAndMac(Cipher.DECRYPT_MODE, key);
+    }
+
     private void initChipher(){
 
         deleteUnnecessaryFiles();
@@ -113,6 +181,7 @@ public class CipherDecipher {
     }
 
     private SecretKey getSecretKey() {
+        /*
         KeyGenerator keyGen = null;
         try {
             keyGen = KeyGenerator.getInstance("DES");
@@ -120,13 +189,16 @@ public class CipherDecipher {
             e.printStackTrace();
         }
         return keyGen.generateKey();
+        */
+        KeyReader kr = new KeyReader(KEY_FILE_PATH);
+        return kr.getKey();
     }
 
     private void initCipherAndMac(int mode, SecretKey key) {
 
         try {
             cipher = Cipher.getInstance(DES_CBC_PKCS5);
-            cipher.init(mode, key);
+            cipher.init(mode, key,iv);
             mac = Mac.getInstance(HMAC_SHA1);
             mac.init(key);
         } catch (NoSuchAlgorithmException e) {
@@ -134,6 +206,8 @@ public class CipherDecipher {
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
     }
@@ -184,9 +258,13 @@ public class CipherDecipher {
         verifyArgsLength(args);
         CipherDecipher cd = new CipherDecipher(args);
 
-        if (cd.mode.equals("-cipher"))
+        if (cd.mode.equals("-cipher")) {
+            System.out.println("Ciphering...");
             cd.cipher();
-        else
+        }
+        else {
+            System.out.println("Deciphering...");
             cd.decipher();
+        }
     }
 }
