@@ -1,12 +1,14 @@
 package utils;
 
 import java.io.*;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Created by fabio on 11-Oct-18.
  */
 public class Reader {
-
 
     public Reader(){}
 
@@ -66,5 +68,27 @@ public class Reader {
     {
         File file = new File(path);
         return (int)file.length();
+    }
+
+    public byte[] getDigest(String path, String mode)
+    {
+        FileInputStream in = null;
+        byte[] digest = null;
+        try {
+            in = new FileInputStream(path);
+            MessageDigest sha = MessageDigest.getInstance(mode);
+            DigestInputStream din = new DigestInputStream(in, sha);
+            int b;
+            while ((b = din.read()) != -1) ;
+            din.close();
+            digest = sha.digest();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return digest;
     }
 }

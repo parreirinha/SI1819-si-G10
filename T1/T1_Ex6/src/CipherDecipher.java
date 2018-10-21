@@ -136,18 +136,10 @@ public class CipherDecipher {
         writer.writeToFileFromArray(DECIPHERED_FILE_PATH, bytesDiciphered);             // last write to decipher file
         writer.writeToFileFromArray(MAC_FROM_DECIPHER_FILE_PATH, macDecipheredFile);    // write mac file
 
-        int cipherMacsize = reader.getFileLength(MAC_FROM_CIPHER_FILE_PATH);        // get MAC files
-        int deciperMacsize = reader.getFileLength(MAC_FROM_DECIPHER_FILE_PATH);
+        byte[] cipherMacDigest = reader.getDigest(MAC_FROM_CIPHER_FILE_PATH, "SHA-1");        // Compare MACs
+        byte[] decipherMacDigest = reader.getDigest(MAC_FROM_DECIPHER_FILE_PATH, "SHA-1");
+        boolean isSameMac = Arrays.equals(cipherMacDigest, decipherMacDigest);
 
-        byte[] cipherMac = reader.getAllBytes(MAC_FROM_CIPHER_FILE_PATH, cipherMacsize);        // Compare MACs
-        byte[] decipherMac = reader.getAllBytes(MAC_FROM_DECIPHER_FILE_PATH, deciperMacsize);
-        boolean isSameMac = Arrays.equals(cipherMac, decipherMac);
-
-
-
-
-
-        
         if (isSameMac)
         {
             System.out.println("Decipher OK");
@@ -181,15 +173,7 @@ public class CipherDecipher {
     }
 
     private SecretKey getSecretKey() {
-        /*
-        KeyGenerator keyGen = null;
-        try {
-            keyGen = KeyGenerator.getInstance("DES");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        return keyGen.generateKey();
-        */
+
         KeyReader kr = new KeyReader(KEY_FILE_PATH);
         return kr.getKey();
     }
