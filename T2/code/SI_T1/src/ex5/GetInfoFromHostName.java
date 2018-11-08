@@ -21,15 +21,13 @@ public class GetInfoFromHostName {
     private final int PORT = 443;
     X509Certificate[] certChain;
     Date smallerExpirationDate;
-    String[] supportedProtocols;
+    ArrayList supportedProtocols;
 
 
     public GetInfoFromHostName(String hostName)
     {
         this.HOST_NAME = hostName;
-        System.out.println("LOG: constructor");
     }
-
 
     public void doWork()
     {
@@ -37,26 +35,20 @@ public class GetInfoFromHostName {
         certChain = getCertificateChain(socket);                        //ponto 1
         smallerExpirationDate = getSmallerExpirationDate(certChain);    //ponto 2
 
-        //As versoes dos protocolos SSL e TLS suportadas (de entre as dispon´ıveis na plataforma Java)
-
         String[] sp = socket.getSupportedProtocols();
-        supportedProtocols = testProtocols(sp);
-        //estabelecer um novo socket com cada uma destas versões e fazer uma ligação para todos e ver em quais tenho sucesso ou nao.
+        supportedProtocols = testProtocols(sp);         // ponto 3
 
-
-        //printResult();
+        printResult();
         closeServer(socket);
     }
 
-    private String[] testProtocols(String[] supportedProtocols) {
+    private ArrayList<String> testProtocols(String[] supportedProtocols) {
 
         ArrayList<String> res = new ArrayList<String>();
 
-        //SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         SSLSocketFactory factory;
         SSLSocket socket = null;
         SSLContext context = null;
-
 
         for (int i = 0; i < supportedProtocols.length; i++) {
 
@@ -68,9 +60,10 @@ public class GetInfoFromHostName {
                 socket = (SSLSocket)factory.createSocket(HOST_NAME, PORT);
                 socket.startHandshake();
                 res.add(supportedProtocols[i]);
-                System.out.println("LOG protocolo => " + supportedProtocols[i]);
+                //System.out.println("LOG protocolo => " + supportedProtocols[i]);
             } catch (NoSuchAlgorithmException e) {
                 //e.printStackTrace();
+                System.out.println("LOG => protocolo não suportado: " + supportedProtocols[i]);
             } catch (KeyManagementException e) {
                 e.printStackTrace();
             } catch (UnknownHostException e) {
@@ -79,7 +72,7 @@ public class GetInfoFromHostName {
                 e.printStackTrace();
             }
         }
-        return res.to;
+        return res;
     }
 
     private Date getSmallerExpirationDate(X509Certificate[] certChain)
@@ -130,19 +123,19 @@ public class GetInfoFromHostName {
 
     private void printResult()
     {
-        System.out.println("Certificate chain:\n\n");
+        System.out.println("1. Certificate chain:");
         for (int i = 0; i < certChain.length; i++)
         {
-            System.out.println(certChain[i].toString() + "\n");
+            System.out.println("\tCertificate nº" + (i+1) + " serial number: " + certChain[i].getSerialNumber());
         }
 
-        System.out.println("SMALLER EXPIRATION DATE:\n\t" + smallerExpirationDate);
+        System.out.println("\n2. SMALLER EXPIRATION DATE:\n\t" + smallerExpirationDate);
 
-        System.out.println("SUPPORTED PROTOCOLS:");
+        System.out.println("\n3. SUPPORTED PROTOCOLS:");
 
-        for (int i = 0; i < supportedProtocols.length; i++) {
+        for (int i = 0; i < supportedProtocols.size(); i++) {
 
-            System.out.println("\t" + supportedProtocols[i]);
+            System.out.println("\t" + supportedProtocols.get(i));
         }
     }
 
