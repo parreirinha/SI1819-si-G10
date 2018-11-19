@@ -24,6 +24,7 @@ public class EntryPoint {
         CipherDecipher.doWork(params);
 
 
+        // T2 wx6 => https://docs.oracle.com/javase/8/docs/technotes/guides/security/crypto/CryptoSpec.html#PBEEx
 
     }
 }

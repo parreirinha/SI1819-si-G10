@@ -1,6 +1,7 @@
 package T1.utils;
 
 import java.io.*;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -56,7 +57,7 @@ public class Reader {
     {
         FileInputStream in = null;
         byte[] digest = null;
-        /*
+
         try {
             in = new FileInputStream(path);
             MessageDigest sha = MessageDigest.getInstance(algorithm);
@@ -70,12 +71,6 @@ public class Reader {
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (IOException e) {
-            e.printStackTrace();
-        }*/
-        byte[] filecontent = getAllBytes(path, 20);
-        try {
-            digest = MessageDigest.getInstance(algorithm).digest(filecontent);
-        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
         return digest;
