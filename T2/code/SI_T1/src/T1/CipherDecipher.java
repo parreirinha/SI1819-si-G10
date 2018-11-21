@@ -102,6 +102,7 @@ public class CipherDecipher {
 
         concatFiles();
         deleteUnnecessaryFiles();
+        System.out.println("End of Cipher");
     }
 
 
@@ -168,8 +169,8 @@ public class CipherDecipher {
     private void initDecipher() {
 
         deleteIfExists(new File(MAC_FROM_CIPHER_FILE_PATH));
-        deleteIfExists(new File(DECIPHERED_FILE_PATH));
         deleteIfExists(new File(MAC_FROM_DECIPHER_FILE_PATH));
+        deleteIfExists(new File(DECIPHERED_FILE_PATH));
 
         reader = new Reader();
         writer = new Writer();
@@ -182,6 +183,9 @@ public class CipherDecipher {
 
         deleteUnnecessaryFiles();
         deleteIfExists(new File(RESULT_FILE_PATH));
+        deleteIfExists(new File(DECIPHERED_FILE_PATH));
+        deleteIfExists(new File(MAC_FROM_CIPHER_FILE_PATH));
+        deleteIfExists(new File(MAC_FROM_DECIPHER_FILE_PATH));
         reader = new Reader();
         writer = new Writer();
         SecretKey key = getSecretKey();
