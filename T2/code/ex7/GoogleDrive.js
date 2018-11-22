@@ -1,37 +1,52 @@
 'use strict'
 
 const request = require('request');
-const CLIENT_ID = 'k74e5lkgzjjjwow'
-const CLIENT_SECRET = 'pq0sj4r5ku0ofbc' 
+
+
+// system variables where RP credentials are stored
+//const CLIENT_ID = process.env.CLIENT_ID
+//const CLIENT_SECRET = process.env.CLIENT_SECRET
+
+const CLIENT_ID = '275607082629-t824itkcdbsm5adldhlju6kspap3r7od.apps.googleusercontent.com'
+const CLIENT_SECRET = 'Oku6DR1Tz2qAIo4DJ9KqUEEF' 
+
+
 
 module.exports = (app) => {
 
-    app.get('/loginDropBox', loginDropBox)
-    app.post('save', saveDocInDropBox)
+    app.get('/', home)
+    app.get('/loginGoogle', loginGoogle)
+    app.get('/listdocs', listdocs)
+    app.get('/copydocs', copydocs)
 
 
-    function loginDropBox(req, resp) {
+    function home(req, resp){
+        
+        const links = '<a href=/loginGoogle>Use Google Account</a><br>'
+                    + '<a href=/loginDropBox>Login to DropBox</a><br>'
+                    + '<a href=/listdocs>List Documents in Drive</a><br>'
+                    + '<a href=/copydocs>Copy document</a>'
+        resp.send(links)
+    }
+
+    function loginGoogle(req, resp) {
         resp.redirect(302,
             // authorization endpoint
-            'https://www.dropbox.com/oauth2/authorize?'
+            'https://accounts.google.com/o/oauth2/v2/auth?'
             // client id
             + 'client_id='+ CLIENT_ID +'&'
             // scope "openid email"
-            //+ 'scope=openid%20email&'
+            + 'scope=openid%20email&'
             // responde_type for "authorization code grant"
             + 'response_type=code&'
             // redirect uri used to register RP
-            + 'redirect_uri=http://localhost:3000/cb-dropbox')
+            + 'redirect_uri=http://localhost:3000/callback')
     }
 
     app.get('/callback', (req, resp) => {
         console.log('making request to token endpoint')
         // https://www.npmjs.com/package/request#examples
         // content-type: application/x-www-form-urlencoded (URL-Encoded Forms)
-
-        //TODO -> adaptar ap dropbox
-
-        /*
         request
             .post(
                 { 
@@ -55,15 +70,16 @@ module.exports = (app) => {
                     );
                 }
             );
-            */
     })
 
 
-    function saveDocInDropBox(req, resp) {
+    function listdocs(req, resp) {
     
     }
 
-
+    function copydocs(req, resp) {
+    
+    }
     
 
 }
