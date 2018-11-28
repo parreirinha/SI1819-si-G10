@@ -1,24 +1,30 @@
-package T1;
+package ex6;
 
-import T1.utils.FileJoin;
-import T1.utils.KeyReader;
-import T1.utils.Writer;
-import T1.utils.Reader;
+import ex6.utils.FileJoin;
+import ex6.utils.Reader;
+import ex6.utils.Writer;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.security.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
+import java.util.Scanner;
 
 
 /**
  * Created by fabio on 13-Oct-18.
  * Exercicio 6
  */
-public class CipherDecipher {
+public class CipherDecipherWithPassword {
 
     //args
     //
@@ -26,23 +32,24 @@ public class CipherDecipher {
     //--decipher CIPHER_RESULT.txt key.txt
 
     //paths to cipher
-    private static final String CHIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\chipherTemp.txt";
-    private static final String AUTH_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\authTemp.txt";
+    private static final String CHIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\chipherTemp.txt";
+    private static final String AUTH_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\authTemp.txt";
     private static final String HMAC_SHA1 = "HmacSHA1";
-    private static final String DES_CBC_PKCS5 = "DES/CBC/PKCS5Padding";
+    private static final String DES_CBC_PKCS5 = "AES/CBC/PKCS5Padding";
 
     //paths to decipher
-    private static final String MAC_FROM_CIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\mac_file_from_cipher.txt";
-    private static final String DECIPHERED_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\DECIPHERED_FILE.pdf";
-    private static final String MAC_FROM_DECIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\mac_file_from_decipher.txt";
-    private static final String IV_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\IV.txt";
+    private static final String MAC_FROM_CIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\mac_file_from_cipher.txt";
+    private static final String DECIPHERED_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\DECIPHERED_FILE.pdf";
+    private static final String MAC_FROM_DECIPHER_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\mac_file_from_decipher.txt";
+    private static final String SALT_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\SALT.txt";
+    public static final String PBE_WITH_HMAC_SHA_256_AND_AES_128 = "PBEWithHmacSHA256AndAES_128";
 
-    private static String RESULT_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\CIPHER_RESULT.txt";
-    private static String INPUT_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\";
-    private static String KEY_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\T1\\";
+    private static String RESULT_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\CIPHER_RESULT.txt";
+    private static String INPUT_FILE_PATH = System.getProperty("user.dir") + "\\SI_T1\\src\\ex6\\";
+
 
     private String mode;
-    private final int readDimensionBlock = 32;
+    private final int readDimensionBlock = 256;
 
     private Reader reader;
     private Writer writer;
@@ -51,11 +58,10 @@ public class CipherDecipher {
     private Mac mac;
 
     private SecureRandom rnd = new SecureRandom();
-    private IvParameterSpec iv;
-    private SecretKey key;
+    private PBEParameterSpec pbeParamSpec;
 
 
-    private  CipherDecipher(String[] cmdLineArgs) throws InterruptedException {
+    private CipherDecipherWithPassword(String[] cmdLineArgs) throws InterruptedException {
 
         mode = cmdLineArgs[0];
 
@@ -66,7 +72,6 @@ public class CipherDecipher {
             System.exit(1);
         }
         INPUT_FILE_PATH += cmdLineArgs[1];
-        KEY_FILE_PATH += cmdLineArgs[2];
     }
 
     private void cipher() throws BadPaddingException, IllegalBlockSizeException {
@@ -150,21 +155,8 @@ public class CipherDecipher {
     }
 
     private void compareChiperAndDecipher() {
-
-        boolean result = false;
-
         //TODO
-        //https://docs.oracle.com/javase/tutorial/security/apisign/gensig.html
-        //https://docs.oracle.com/javase/tutorial/security/apisign/versig.html
 
-        if (result)
-        {
-            System.out.println("Decipher OK");
-        }
-        else
-        {
-            System.out.println("Decipher NOT OK!!!");
-        }
     }
 
     private void initDecipher() {
@@ -176,7 +168,7 @@ public class CipherDecipher {
         reader = new Reader();
         writer = new Writer();
         SecretKey key = getSecretKey();
-        setIV();
+        setPBEParamSpec();
         initCipherAndMac(Cipher.DECRYPT_MODE, key);
     }
 
@@ -189,38 +181,65 @@ public class CipherDecipher {
         deleteIfExists(new File(MAC_FROM_DECIPHER_FILE_PATH));
         reader = new Reader();
         writer = new Writer();
-        key = getSecretKey();
-        setIV();
+        SecretKey key = getSecretKey();
+        setPBEParamSpec();
         initCipherAndMac(Cipher.ENCRYPT_MODE, key);
     }
 
-    private void setIV() {
+    private void setPBEParamSpec() {
 
-        if (this.mode.equals("-cipher")) {
+        byte[] salt = new byte[128];
+        // Iteration count
+        int count = 1000;
 
-            deleteIfExists(new File(IV_PATH));
-            iv = new IvParameterSpec(rnd.generateSeed(8));
-            byte[] ivByte = iv.getIV();
-            writer.writeToFileFromArray(IV_PATH, ivByte);
+        if(this.mode.equals("-cipher")) {
+
+            IvParameterSpec iv = new IvParameterSpec(rnd.generateSeed(16));
+            //byte[] ivByte = iv.getIV();
+            new SecureRandom().nextBytes(salt);
+            // Create PBE parameter set
+            pbeParamSpec = new PBEParameterSpec(salt, count, iv);
+            deleteIfExists(new File(SALT_PATH));
+            writer.writeFileWithNoAppend(SALT_PATH, pbeParamSpec.getSalt());
         }
-        else {
-
-            byte[] ivByte = reader.getAllBytes(IV_PATH, 8);
-            iv = new IvParameterSpec(ivByte);
+        else
+        {
+            //read params
+            int filelengt = reader.getFileLength(SALT_PATH);
+            byte[] saltSaved = reader.getAllBytes(SALT_PATH, filelengt);
+            pbeParamSpec = new PBEParameterSpec(saltSaved, count);
         }
     }
 
     private SecretKey getSecretKey() {
 
-        KeyReader kr = new KeyReader(KEY_FILE_PATH);
-        return kr.getKey();
+        PBEKeySpec pbeKeySpec;
+        SecretKeyFactory keyFac;
+        SecretKey pbeKey = null;
+        Scanner sc = new Scanner(System.in);
+
+        System.out.println("Enter Password");
+
+        String pw = sc.nextLine();
+        char[] password = pw.toCharArray();
+        pbeKeySpec = new PBEKeySpec(password);
+        try {
+            keyFac = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
+            pbeKey = keyFac.generateSecret(pbeKeySpec);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        return pbeKey;
     }
 
     private void initCipherAndMac(int mode, SecretKey key) {
 
         try {
-            cipher = Cipher.getInstance(DES_CBC_PKCS5);
-            cipher.init(mode, key,iv);
+            cipher = Cipher.getInstance(PBE_WITH_HMAC_SHA_256_AND_AES_128);
+            cipher.init(mode, key);
             mac = Mac.getInstance(HMAC_SHA1);
             mac.init(key);
         } catch (NoSuchAlgorithmException e) {
@@ -228,8 +247,6 @@ public class CipherDecipher {
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
     }
@@ -250,7 +267,7 @@ public class CipherDecipher {
     
     private static void verifyArgsLength(String[] args) {
 
-        if (args.length != 3)
+        if (args.length != 2)
         {
             System.out.println("expect 3 arguments");
             return;
@@ -299,7 +316,7 @@ public class CipherDecipher {
  public static void doWork(String[] args) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, IOException, InterruptedException {
 
      verifyArgsLength(args);
-     CipherDecipher cd = new CipherDecipher(args);
+     CipherDecipherWithPassword cd = new CipherDecipherWithPassword(args);
 
      if (cd.mode.equals("-cipher")) {
          System.out.println("Ciphering...");
